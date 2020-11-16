@@ -5,6 +5,7 @@ import android.util.Size
 import androidx.appcompat.app.AppCompatActivity
 import com.otaliastudios.cameraview.controls.Audio
 import com.otaliastudios.cameraview.controls.Facing
+import com.otaliastudios.cameraview.size.SizeSelectors
 import husaynhakeem.io.facedetector.FaceDetector
 import husaynhakeem.io.facedetector.Frame
 import husaynhakeem.io.facedetector.LensFacing
@@ -44,6 +45,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupCamera(lensFacing: Facing) {
         val faceDetector = FaceDetector(faceBoundsOverlay)
         viewfinder.facing = lensFacing
+        // For better performance when working with face images
+        viewfinder.setPreviewStreamSize(SizeSelectors.maxWidth(MAX_PREVIEW_WIDTH))
         viewfinder.audio = Audio.OFF
 
         viewfinder.addFrameProcessor {
@@ -68,5 +71,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val KEY_LENS_FACING = "key-lens-facing"
+        private const val MAX_PREVIEW_WIDTH = 480
     }
 }

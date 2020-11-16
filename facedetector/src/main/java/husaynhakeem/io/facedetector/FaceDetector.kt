@@ -1,6 +1,6 @@
 package husaynhakeem.io.facedetector
 
-import android.graphics.RectF
+import android.graphics.*
 import android.os.Looper
 import android.util.Log
 import android.view.View
@@ -10,6 +10,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -89,6 +90,8 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
                         isProcessing = false
                     }
 
+                    // Extract face image for each detected face
+                    val faceBitmaps = faces.map { it.toFaceBitmap(this) }
                     // Correct the detected faces so that they're correctly rendered on the UI, then
                     // pass them to [faceBoundsOverlay] to be drawn.
                     val faceBounds = faces.map { face -> face.toFaceBounds(this) }
@@ -138,6 +141,69 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
         return FaceBounds(
                 trackingId,
                 scaledBoundingBox
+        )
+    }
+
+    private fun Frame.toBitmap(): Bitmap {
+        val out = ByteArrayOutputStream()
+        val yuvImage = YuvImage(
+                this.data,
+                ImageFormat.NV21,
+                size.width,
+                size.height,
+                null
+        )
+        yuvImage.compressToJpeg(
+                Rect(
+                        0,
+                        0,
+                        size.width,
+                        size.height
+                ), 90, out
+        )
+        val imageBytes: ByteArray = out.toByteArray()
+
+        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+    }
+
+    /**
+     * Converts detected face to bitmap image containing just the face
+     */
+    private fun Face.toFaceBitmap(frame: Frame): Bitmap = boundingBox.run {
+        var bitmap = frame.toBitmap()
+
+        // Rotation
+        val rotationMatrix = Matrix().apply { setRotate(frame.rotation.toFloat()) }
+
+        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, rotationMatrix, true)
+
+        var faceWidth: Int = width()
+        var faceHeight: Int = height()
+
+        var faceX: Int = left
+        var faceY: Int = top
+
+        // Constraints
+        val beyondRightPixels = faceX + faceWidth - bitmap.width
+        if (beyondRightPixels > 0)
+            faceX -= beyondRightPixels
+
+        val beyondTopPixels = faceY + faceHeight - bitmap.height
+        if (beyondTopPixels > 0)
+            faceY -= beyondTopPixels
+
+        if (faceX < 0)
+            faceX = 0
+
+        if (faceY < 0)
+            faceY = 0
+
+        return Bitmap.createBitmap(
+            bitmap,
+            faceX,
+            faceY,
+            faceWidth,
+            faceHeight
         )
     }
 
