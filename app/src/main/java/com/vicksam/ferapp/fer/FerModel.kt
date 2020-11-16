@@ -1,4 +1,4 @@
-package com.vicksam.ferapp.model
+package com.vicksam.ferapp.fer
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -7,6 +7,7 @@ import com.vicksam.ferapp.utils.BitmapUtils.toGrayscaleByteBuffer
 import org.tensorflow.lite.Interpreter
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.exp
 
 private const val MODEL_FILE_NAME = "fer_model.tflite"
 private const val LABELS_FILE_NAME = "fer_model.names"
@@ -36,7 +37,7 @@ object FerModel {
         return interpreter
     }
 
-    fun classify(inputImage: Bitmap) {
+    fun classify(inputImage: Bitmap): String {
         val input = Bitmap.createScaledBitmap(
             inputImage,
             INPUT_IMAGE_WIDTH,
@@ -46,7 +47,7 @@ object FerModel {
             .toGrayscale()
             .toGrayscaleByteBuffer()
 
-        val probabilities = getPredictedProbabilities(input)
+        return predict(input).toPrediction().toLabel()
     }
 
     private fun loadModelFromAssets(context: Context): Interpreter {
@@ -63,7 +64,10 @@ object FerModel {
                 .forEachLine { add(it) }
         }
 
-    private fun getPredictedProbabilities(input: ByteBuffer): FloatArray {
+    /**
+     * Runs model to get prediction, returns logits
+     */
+    private fun predict(input: ByteBuffer): FloatArray {
         // Byte buffer that will take in model output
         val outputByteBuffer = ByteBuffer
             // 4 bytes per each pixel (float takes 4 pixels)
@@ -74,7 +78,7 @@ object FerModel {
         interpreter.run(input, outputByteBuffer)
 
         // Array that will take in output
-        val probabilities = FloatArray(N_CLASSES)
+        val logits = FloatArray(N_CLASSES)
 
         // Read model output into output buffer
         val labelsBuffer = outputByteBuffer.run {
@@ -83,8 +87,26 @@ object FerModel {
         }
 
         // Put model output into output array
-        labelsBuffer.get(probabilities)
+        labelsBuffer.get(logits)
 
-        return probabilities.clone()
+        return logits
     }
+
+    /**
+     * Turns logits to the most probable class
+     */
+    private fun FloatArray.toPrediction(): Int {
+        // Softmax
+        var probabilities = this.map { exp(it.toDouble()) }
+            .run { map { it / sum() } }
+        val test = probabilities.sum().toInt() == 1
+
+        // Index of max element
+        return probabilities.indices.maxByOrNull { it } ?: -1
+    }
+
+    /**
+     * Turns class index to text label
+     */
+    private fun Int.toLabel() = labels[this]
 }

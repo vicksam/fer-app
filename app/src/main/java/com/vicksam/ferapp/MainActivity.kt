@@ -1,18 +1,26 @@
 package com.vicksam.ferapp
 
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.Size
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 import com.otaliastudios.cameraview.controls.Audio
 import com.otaliastudios.cameraview.controls.Facing
 import com.otaliastudios.cameraview.size.SizeSelectors
-import com.vicksam.ferapp.model.FerModel
+import com.vicksam.ferapp.fer.FerModel
+import com.vicksam.ferapp.fer.FerViewModel
+import husaynhakeem.io.facedetector.FaceBounds
 import husaynhakeem.io.facedetector.FaceDetector
 import husaynhakeem.io.facedetector.Frame
 import husaynhakeem.io.facedetector.LensFacing
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
+
+    private val viewModel = ViewModelProvider
+        .NewInstanceFactory()
+        .create(FerViewModel::class.java)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,23 +55,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupCamera(lensFacing: Facing) {
         val faceDetector = FaceDetector(faceBoundsOverlay)
+        faceDetector.setOnFaceDetectionListener(object : FaceDetector.OnFaceDetectionResultListener {
+            override fun onSuccess(faceBounds: List<FaceBounds>, faceBitmaps: List<Bitmap>) {
+                super.onSuccess(faceBounds, faceBitmaps)
+                viewModel.onFacesDetected(faceBounds, faceBitmaps)
+            }
+        })
+
         viewfinder.facing = lensFacing
         // For better performance when working with face images
         viewfinder.setPreviewStreamSize(SizeSelectors.maxWidth(MAX_PREVIEW_WIDTH))
         viewfinder.audio = Audio.OFF
 
         viewfinder.addFrameProcessor {
-            it.size?.run {
-                faceDetector.process(
-                    Frame(
-                        data = it.data,
-                        rotation = it.rotation,
-                        size = Size(it.size.width, it.size.height),
-                        format = it.format,
-                        lensFacing = if (viewfinder.facing == Facing.BACK) LensFacing.BACK else LensFacing.FRONT
-                    )
+            faceDetector.process(
+                Frame(
+                    data = it.data,
+                    rotation = it.rotation,
+                    size = Size(it.size.width, it.size.height),
+                    format = it.format,
+                    lensFacing = if (viewfinder.facing == Facing.BACK) LensFacing.BACK else LensFacing.FRONT
                 )
-            }
+            )
         }
 
         toggleCameraButton.setOnClickListener {

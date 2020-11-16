@@ -57,7 +57,7 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
     }
 
     /** Sets a listener to receive face detection result callbacks. */
-    fun setonFaceDetectionFailureListener(listener: OnFaceDetectionResultListener) {
+    fun setOnFaceDetectionListener(listener: OnFaceDetectionResultListener) {
         onFaceDetectionResultListener = listener
     }
 
@@ -95,6 +95,8 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
                     // Correct the detected faces so that they're correctly rendered on the UI, then
                     // pass them to [faceBoundsOverlay] to be drawn.
                     val faceBounds = faces.map { face -> face.toFaceBounds(this) }
+
+                    onFaceDetectionResultListener?.onSuccess(faceBounds, faceBitmaps)
                     mainExecutor.execute { faceBoundsOverlay.updateFaces(faceBounds) }
                 }
                 .addOnFailureListener { exception ->
@@ -223,7 +225,7 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
          *
          * @param faceBounds Detected faces from a camera frame
          */
-        fun onSuccess(faceBounds: List<FaceBounds>) {}
+        fun onSuccess(faceBounds: List<FaceBounds>, faceBitmaps: List<Bitmap>) {}
 
         /**
          * Invoked when an error is encountered while attempting to detect faces in a camera frame.
