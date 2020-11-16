@@ -3,7 +3,8 @@ package com.vicksam.ferapp
 import android.os.Bundle
 import android.util.Size
 import androidx.appcompat.app.AppCompatActivity
-import com.otaliastudios.cameraview.Facing
+import com.otaliastudios.cameraview.controls.Audio
+import com.otaliastudios.cameraview.controls.Facing
 import husaynhakeem.io.facedetector.FaceDetector
 import husaynhakeem.io.facedetector.Frame
 import husaynhakeem.io.facedetector.LensFacing
@@ -20,14 +21,14 @@ class MainActivity : AppCompatActivity() {
         setupCamera(lensFacing)
     }
 
-    override fun onResume() {
-        super.onResume()
-        viewfinder.start()
+    override fun onStart() {
+        super.onStart()
+        viewfinder.open()
     }
 
-    override fun onPause() {
-        super.onPause()
-        viewfinder.stop()
+    override fun onStop() {
+        super.onStop()
+        viewfinder.close()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -43,16 +44,20 @@ class MainActivity : AppCompatActivity() {
     private fun setupCamera(lensFacing: Facing) {
         val faceDetector = FaceDetector(faceBoundsOverlay)
         viewfinder.facing = lensFacing
+        viewfinder.audio = Audio.OFF
+
         viewfinder.addFrameProcessor {
-            faceDetector.process(
+            it.size?.run {
+                faceDetector.process(
                     Frame(
-                            data = it.data,
-                            rotation = it.rotation,
-                            size = Size(it.size.width, it.size.height),
-                            format = it.format,
-                            lensFacing = if (viewfinder.facing == Facing.BACK) LensFacing.BACK else LensFacing.FRONT
+                        data = it.data,
+                        rotation = it.rotation,
+                        size = Size(it.size.width, it.size.height),
+                        format = it.format,
+                        lensFacing = if (viewfinder.facing == Facing.BACK) LensFacing.BACK else LensFacing.FRONT
                     )
-            )
+                )
+            }
         }
 
         toggleCameraButton.setOnClickListener {

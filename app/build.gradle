@@ -31,6 +31,9 @@ android {
     kotlinOptions {
         jvmTarget = '1.8'
     }
+    aaptOptions {
+        noCompress "tflite", "lite"
+    }
 }
 
 dependencies {
@@ -43,7 +46,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
 
     // Camera
-    implementation "com.otaliastudios:cameraview:1.5.1"
+    implementation "com.otaliastudios:cameraview:2.0.0"
 
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
