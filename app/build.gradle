@@ -48,6 +48,10 @@ dependencies {
     // Camera
     implementation "com.otaliastudios:cameraview:2.0.0"
 
+    // Firebase custom TensorflowLite model dependencies
+    implementation 'com.google.firebase:firebase-ml-model-interpreter:22.0.4'
+    implementation 'org.tensorflow:tensorflow-lite:2.3.0'
+
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'

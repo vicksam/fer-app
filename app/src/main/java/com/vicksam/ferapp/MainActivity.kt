@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.otaliastudios.cameraview.controls.Audio
 import com.otaliastudios.cameraview.controls.Facing
 import com.otaliastudios.cameraview.size.SizeSelectors
+import com.vicksam.ferapp.model.FerModel
 import husaynhakeem.io.facedetector.FaceDetector
 import husaynhakeem.io.facedetector.Frame
 import husaynhakeem.io.facedetector.LensFacing
@@ -20,6 +21,8 @@ class MainActivity : AppCompatActivity() {
         val lensFacing =
                 savedInstanceState?.getSerializable(KEY_LENS_FACING) as Facing? ?: Facing.BACK
         setupCamera(lensFacing)
+        // Load model
+        FerModel.load(this)
     }
 
     override fun onStart() {

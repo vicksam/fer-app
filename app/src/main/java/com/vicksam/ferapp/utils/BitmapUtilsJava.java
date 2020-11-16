@@ -6,14 +6,15 @@ import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 
-public class BitmapUtils {
+class BitmapUtilsJava {
     /**
+     * Converts RGBA bitmap to grayscale bitmap
      *
      * Converts bitmap so it appears as a grasycale image. It leaves the image having 4-channels
      * (as for input bitmap format, RGBA), but every channel has the same color value for a single
      * pixel.
      */
-    public static Bitmap toGrayscale(Bitmap bmpOriginal) {
+    static Bitmap toGrayscale(Bitmap bmpOriginal) {
         int width, height;
         height = bmpOriginal.getHeight();
         width = bmpOriginal.getWidth();
