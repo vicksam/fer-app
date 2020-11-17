@@ -18,6 +18,7 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
     View(ctx, attrs) {
 
     private val facesBounds = mutableListOf<FaceBounds>()
+    private val emotionLabels = mutableMapOf<Int, String>()
     private val anchorPaint = Paint()
     private val idPaint = Paint()
     private val boundsPaint = Paint()
@@ -39,11 +40,21 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
         invalidate()
     }
 
+    fun updateEmotionLabels(emotions: Map<Int, String>) {
+        emotionLabels.clear()
+        emotionLabels.putAll(emotions)
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         facesBounds.forEach { faceBounds ->
-            canvas.drawAnchor(faceBounds.box.center())
-            canvas.drawId(faceBounds.id.toString(), faceBounds.box.center())
+            if (DRAW_ID) {
+                canvas.drawAnchor(faceBounds.box.center())
+                canvas.drawId(faceBounds.id.toString(), faceBounds.box.center())
+            }
+            emotionLabels[faceBounds.id]?.let {
+                canvas.drawEmotionLabel(it, faceBounds.box.center())
+            }
             canvas.drawBounds(faceBounds.box)
         }
     }
@@ -56,6 +67,11 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
     /** Draws (Writes) the face's id. */
     private fun Canvas.drawId(faceId: String, center: PointF) {
         drawText("face id $faceId", center.x - ID_OFFSET, center.y + ID_OFFSET, idPaint)
+    }
+
+    /** Draws (Writes) the emotion label. */
+    private fun Canvas.drawEmotionLabel(emotion: String, center: PointF) {
+        drawText(emotion, center.x, center.y, idPaint)
     }
 
     /** Draws bounds around a face as a rectangle. */
@@ -71,6 +87,7 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
 
     companion object {
         private const val ANCHOR_RADIUS = 10f
+        private const val DRAW_ID = false
         private const val ID_OFFSET = 50f
     }
 }

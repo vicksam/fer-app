@@ -101,8 +101,8 @@ object FerModel {
             .run { map { it / sum() } }
         val test = probabilities.sum().toInt() == 1
 
-        // Index of max element
-        return probabilities.indices.maxByOrNull { it } ?: -1
+        // Class with max probability
+        return probabilities.indices.maxByOrNull { probabilities[it] } ?: -1
     }
 
     /**

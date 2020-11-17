@@ -29,8 +29,14 @@ class MainActivity : AppCompatActivity() {
         val lensFacing =
                 savedInstanceState?.getSerializable(KEY_LENS_FACING) as Facing? ?: Facing.BACK
         setupCamera(lensFacing)
+
         // Load model
         FerModel.load(this)
+
+        // Setup observer
+        viewModel.emotions().observe(this, {
+            it?.let { faceBoundsOverlay.updateEmotionLabels(it) }
+        })
     }
 
     override fun onStart() {
