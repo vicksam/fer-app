@@ -7,15 +7,19 @@ import android.view.View
 import androidx.annotation.GuardedBy
 import com.google.android.gms.common.util.concurrent.HandlerExecutor
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import java.io.ByteArrayOutputStream
+import husaynhakeem.io.facedetector.FaceDetectorUtils.calculateTextRotation
+import husaynhakeem.io.facedetector.FaceDetectorUtils.toFaceBitmapList
+import husaynhakeem.io.facedetector.FaceDetectorUtils.toFaceBoundsList
+import husaynhakeem.io.facedetector.FaceDetectorUtils.toFaceRect
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
+
+    private var currentRotationAngle = 90
 
     private val mlkitFaceDetector = FaceDetection.getClient(
             FaceDetectorOptions.Builder()
@@ -29,6 +33,9 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
 
     /** Listener that gets notified when a face detection result is ready. */
     private var onFaceDetectionResultListener: OnFaceDetectionResultListener? = null
+
+    /** Listener that gets notified when a rotation angle is changed. */
+    private var onRotationChangedListener: OnRotationChangedListener? = null
 
     /** [Executor] used to run the face detection on a background thread.  */
     private lateinit var faceDetectionExecutor: ExecutorService
@@ -54,11 +61,24 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
                 }
             }
         })
+
+        setOnRotationAngleChangedListener(object : OnRotationChangedListener {
+            override fun onChanged(rotationAngle: Int, isFrontFacingCam: Boolean) {
+                faceBoundsOverlay.updateTextRotationAngle(
+                        calculateTextRotation(rotationAngle, isFrontFacingCam)
+                )
+            }
+        })
     }
 
     /** Sets a listener to receive face detection result callbacks. */
     fun setOnFaceDetectionListener(listener: OnFaceDetectionResultListener) {
         onFaceDetectionResultListener = listener
+    }
+
+    /** Sets a listener to receive notifications about changes in rotation. */
+    fun setOnRotationAngleChangedListener(listener: OnRotationChangedListener) {
+        onRotationChangedListener = listener
     }
 
     /**
@@ -90,13 +110,22 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
                         isProcessing = false
                     }
 
-                    // Extract face image for each detected face
-                    val faceBitmaps = faces.map { it.toFaceBitmap(this) }
-                    // Correct the detected faces so that they're correctly rendered on the UI, then
-                    // pass them to [faceBoundsOverlay] to be drawn.
-                    val faceBounds = faces.map { face -> face.toFaceBounds(this) }
+                    // Extract a bounding box (rect) for each detected face
+                    val faceRects = faces.map { it.toFaceRect(this) }
+                    // Cut each face image from a frame
+                    val faceBitmaps = faceRects.toFaceBitmapList(this)
 
+                    val faceRectsWithIds = faces
+                                .map { it.trackingId }
+                                .zip(faceRects.map { RectF(it) })
+                    // Transform the coordinates of the face rects so they are correctly rendered
+                    // on the screen
+                    val faceBounds = faceRectsWithIds.toFaceBoundsList(this, faceBoundsOverlay)
+
+                    // Update listeners
                     onFaceDetectionResultListener?.onSuccess(faceBounds, faceBitmaps)
+                    updateRotationListenerOnRotationChange()
+
                     mainExecutor.execute { faceBoundsOverlay.updateFaces(faceBounds) }
                 }
                 .addOnFailureListener { exception ->
@@ -107,106 +136,11 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
                 }
     }
 
-    /**
-     * Converts a [Face] to an instance of [FaceBounds] while correctly transforming the face's
-     * bounding box by scaling it to match the overlay and mirroring it when the lens facing
-     * represents the front facing camera.
-     */
-    private fun Face.toFaceBounds(frame: Frame): FaceBounds {
-        // In order to correctly display the face bounds, the orientation of the processed image
-        // (frame) and that of the overlay have to match. Which is why the dimensions of
-        // the analyzed image are reversed if its rotation is 90 or 270.
-        val reverseDimens = frame.rotation == 90 || frame.rotation == 270
-        val width = if (reverseDimens) frame.size.height else frame.size.width
-        val height = if (reverseDimens) frame.size.width else frame.size.height
-
-        // Since the analyzed image (frame) probably has a different resolution (width and height)
-        // compared to the overlay view, we compute by how much we have to scale the bounding box
-        // so that it is displayed correctly on the overlay.
-        val scaleX = faceBoundsOverlay.width.toFloat() / width
-        val scaleY = faceBoundsOverlay.height.toFloat() / height
-
-        // If the front camera lens is being used, reverse the right/left coordinates
-        val isFrontLens = frame.lensFacing == LensFacing.FRONT
-        val flippedLeft = if (isFrontLens) width - boundingBox.right else boundingBox.left
-        val flippedRight = if (isFrontLens) width - boundingBox.left else boundingBox.right
-
-        // Scale all coordinates to match the overlay
-        val scaledLeft = scaleX * flippedLeft
-        val scaledTop = scaleY * boundingBox.top
-        val scaledRight = scaleX * flippedRight
-        val scaledBottom = scaleY * boundingBox.bottom
-        val scaledBoundingBox = RectF(scaledLeft, scaledTop, scaledRight, scaledBottom)
-
-        // Return the scaled bounding box and a tracking id of the detected face. The tracking id
-        // remains the same as long as the same face continues to be detected.
-        return FaceBounds(
-                trackingId,
-                scaledBoundingBox
-        )
-    }
-
-    private fun Frame.toBitmap(): Bitmap {
-        val out = ByteArrayOutputStream()
-        val yuvImage = YuvImage(
-                this.data,
-                ImageFormat.NV21,
-                size.width,
-                size.height,
-                null
-        )
-        yuvImage.compressToJpeg(
-                Rect(
-                        0,
-                        0,
-                        size.width,
-                        size.height
-                ), 90, out
-        )
-        val imageBytes: ByteArray = out.toByteArray()
-
-        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-    }
-
-    /**
-     * Converts detected face to bitmap image containing just the face
-     */
-    private fun Face.toFaceBitmap(frame: Frame): Bitmap = boundingBox.run {
-        var bitmap = frame.toBitmap()
-
-        // Rotation
-        val rotationMatrix = Matrix().apply { setRotate(frame.rotation.toFloat()) }
-
-        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, rotationMatrix, true)
-
-        var faceWidth: Int = width()
-        var faceHeight: Int = height()
-
-        var faceX: Int = left
-        var faceY: Int = top
-
-        // Constraints
-        val beyondRightPixels = faceX + faceWidth - bitmap.width
-        if (beyondRightPixels > 0)
-            faceX -= beyondRightPixels
-
-        val beyondTopPixels = faceY + faceHeight - bitmap.height
-        if (beyondTopPixels > 0)
-            faceY -= beyondTopPixels
-
-        if (faceX < 0)
-            faceX = 0
-
-        if (faceY < 0)
-            faceY = 0
-
-        return Bitmap.createBitmap(
-            bitmap,
-            faceX,
-            faceY,
-            faceWidth,
-            faceHeight
-        )
+    private fun Frame.updateRotationListenerOnRotationChange() {
+        if (rotation != currentRotationAngle) {
+            currentRotationAngle = rotation
+            onRotationChangedListener?.onChanged(rotation, isFrontFacingCam())
+        }
     }
 
     private fun onError(exception: Exception) {
@@ -221,7 +155,7 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
     interface OnFaceDetectionResultListener {
         /**
          * Signals that the face detection process has successfully completed for a camera frame.
-         * It also provides the result of the face detection for further potential processing.
+         * It also provides the result of the face detection for potential further processing.
          *
          * @param faceBounds Detected faces from a camera frame
          */
@@ -234,6 +168,16 @@ class FaceDetector(private val faceBoundsOverlay: FaceBoundsOverlay) {
          * frame.
          */
         fun onFailure(exception: Exception) {}
+    }
+
+    /**
+     * Interface containing callbacks that are invoked when the frame rotation changes.
+     */
+    interface OnRotationChangedListener {
+        /**
+         * Signals a change in frame rotation.
+         */
+        fun onChanged(rotationAngle: Int, isFrontFacingCam: Boolean) {}
     }
 
     companion object {

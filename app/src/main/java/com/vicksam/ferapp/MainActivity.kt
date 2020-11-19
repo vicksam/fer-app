@@ -33,10 +33,7 @@ class MainActivity : AppCompatActivity() {
         // Load model
         FerModel.load(this)
 
-        // Setup observer
-        viewModel.emotions().observe(this, {
-            it?.let { faceBoundsOverlay.updateEmotionLabels(it) }
-        })
+        setupObservers()
     }
 
     override fun onStart() {
@@ -59,35 +56,43 @@ class MainActivity : AppCompatActivity() {
         viewfinder.destroy()
     }
 
+    private fun setupObservers() {
+        viewModel.emotionLabels().observe(this, {
+            it?.let { faceBoundsOverlay.updateEmotionLabels(it) }
+        })
+    }
+
     private fun setupCamera(lensFacing: Facing) {
-        val faceDetector = FaceDetector(faceBoundsOverlay)
-        faceDetector.setOnFaceDetectionListener(object : FaceDetector.OnFaceDetectionResultListener {
+        val faceDetector = FaceDetector(faceBoundsOverlay).also { it.setup() }
+
+            viewfinder.facing = lensFacing
+            // Lower the frame resolution for better computation performance when working with face images
+            viewfinder.setPreviewStreamSize(SizeSelectors.maxWidth(MAX_PREVIEW_WIDTH))
+            viewfinder.audio = Audio.OFF
+
+            viewfinder.addFrameProcessor {
+                faceDetector.process(
+                        Frame(
+                                data = it.data,
+                                rotation = it.rotation,
+                                size = Size(it.size.width, it.size.height),
+                                format = it.format,
+                                lensFacing = if (viewfinder.facing == Facing.BACK) LensFacing.BACK else LensFacing.FRONT
+                        )
+                )
+            }
+
+            toggleCameraButton.setOnClickListener {
+                viewfinder.toggleFacing()
+            }
+        }
+
+    private fun FaceDetector.setup() = run {
+        setOnFaceDetectionListener(object : FaceDetector.OnFaceDetectionResultListener {
             override fun onSuccess(faceBounds: List<FaceBounds>, faceBitmaps: List<Bitmap>) {
-                super.onSuccess(faceBounds, faceBitmaps)
                 viewModel.onFacesDetected(faceBounds, faceBitmaps)
             }
         })
-
-        viewfinder.facing = lensFacing
-        // For better performance when working with face images
-        viewfinder.setPreviewStreamSize(SizeSelectors.maxWidth(MAX_PREVIEW_WIDTH))
-        viewfinder.audio = Audio.OFF
-
-        viewfinder.addFrameProcessor {
-            faceDetector.process(
-                Frame(
-                    data = it.data,
-                    rotation = it.rotation,
-                    size = Size(it.size.width, it.size.height),
-                    format = it.format,
-                    lensFacing = if (viewfinder.facing == Facing.BACK) LensFacing.BACK else LensFacing.FRONT
-                )
-            )
-        }
-
-        toggleCameraButton.setOnClickListener {
-            viewfinder.toggleFacing()
-        }
     }
 
     companion object {

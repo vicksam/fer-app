@@ -8,19 +8,24 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import husaynhakeem.io.facedetector.FaceBounds
 
+/**
+ * Once it receives face pictures, it runs the model and returns prediction emotion labels
+ */
 class FerViewModel : ViewModel() {
 
-    private val emotions = MutableLiveData<Map<Int, String>>()
-    fun emotions(): LiveData<Map<Int, String>> = emotions
+    private val emotionLabels = MutableLiveData<Map<Int, String>>()
+    fun emotionLabels(): LiveData<Map<Int, String>> = emotionLabels
 
     private var processing: Boolean = false
 
     fun onFacesDetected(faceBounds: List<FaceBounds>, faceBitmaps: List<Bitmap>) {
+        if (faceBitmaps.isEmpty()) return
+
         synchronized(FerViewModel::class.java) {
             if (!processing) {
                 processing = true
                 Handler(Looper.getMainLooper()).post {
-                    emotions.value = faceBounds.mapNotNull { it.id }
+                    emotionLabels.value = faceBounds.mapNotNull { it.id }
                         .zip(faceBitmaps)
                         .toMap()
                         .run { getEmotionsMap(this) }

@@ -8,4 +8,6 @@ data class Frame(
     val size: Size,
     val format: Int,
     val lensFacing: LensFacing
-)
+) {
+    fun isFrontFacingCam() = lensFacing == LensFacing.FRONT
+}

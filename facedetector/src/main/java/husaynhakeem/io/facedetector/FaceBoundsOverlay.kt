@@ -1,10 +1,7 @@
 package husaynhakeem.io.facedetector
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PointF
-import android.graphics.RectF
+import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
@@ -22,6 +19,8 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
     private val anchorPaint = Paint()
     private val idPaint = Paint()
     private val boundsPaint = Paint()
+
+    private var textRotationAngle: Int = 0
 
     init {
         anchorPaint.color = ContextCompat.getColor(context, android.R.color.holo_blue_dark)
@@ -45,6 +44,10 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
         emotionLabels.putAll(emotions)
     }
 
+    fun updateTextRotationAngle(textRotationAngle: Int) {
+        this.textRotationAngle = textRotationAngle
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         facesBounds.forEach { faceBounds ->
@@ -59,6 +62,24 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
         }
     }
 
+    /**
+     * Draws text on canvas, but rotated around the point (x, y).
+     *
+     * By default, text is always drawn aligned with the bottom control. Because I enforce
+     * vertical mode, here I can manually alter that angle so it is aligned with device rotation.
+     */
+    private fun Canvas.drawRotatedText(
+            text: String,
+            x: Float,
+            y: Float,
+            paint: Paint,
+            angle: Int = textRotationAngle
+    ) {
+        rotate(angle.toFloat(), x, y)
+        drawText(text, x, y, paint)
+        rotate(-angle.toFloat(), x, y)
+    }
+
     /** Draws an anchor (dot) at the center of a face. */
     private fun Canvas.drawAnchor(center: PointF) {
         drawCircle(center.x, center.y, ANCHOR_RADIUS, anchorPaint)
@@ -66,12 +87,12 @@ class FaceBoundsOverlay @JvmOverloads constructor(ctx: Context, attrs: Attribute
 
     /** Draws (Writes) the face's id. */
     private fun Canvas.drawId(faceId: String, center: PointF) {
-        drawText("face id $faceId", center.x - ID_OFFSET, center.y + ID_OFFSET, idPaint)
+        drawRotatedText("face id $faceId", center.x - ID_OFFSET, center.y + ID_OFFSET, idPaint)
     }
 
     /** Draws (Writes) the emotion label. */
     private fun Canvas.drawEmotionLabel(emotion: String, center: PointF) {
-        drawText(emotion, center.x, center.y, idPaint)
+        drawRotatedText(emotion, center.x, center.y, idPaint)
     }
 
     /** Draws bounds around a face as a rectangle. */
