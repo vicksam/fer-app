@@ -29,7 +29,8 @@ Thumbs.db
 build/
 .navigation
 captures/
-output.json 
+output.json
+app/release
 
 #NDK
 obj/
